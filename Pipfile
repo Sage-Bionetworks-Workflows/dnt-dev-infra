@@ -8,6 +8,6 @@ python_version = "3.8"
 
 [dev-packages]
 pre-commit = ">=2.*"
-sceptre = ">=3.1.*"
+sceptre = "==3.0.0"
 
 [packages]
