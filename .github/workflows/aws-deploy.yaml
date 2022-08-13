@@ -24,14 +24,13 @@ jobs:
           aws_access_key_id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
           role_to_assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
-          python_version: '3.10'
+          python_version: '3.8'
 
       - name: Install dependencies
         env:
           PIPENV_NOSPIN: 'true'
         shell: bash
         run: |
-          pipenv lock --clear
           pipenv install --dev
 
       - name: Deploy sceptre stacks
