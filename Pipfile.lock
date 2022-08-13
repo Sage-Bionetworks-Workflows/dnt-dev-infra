@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "cec3d6ddfb2f5d10ef5123ac7809ad5de9a66f4f748ad6067649a11db624e177"
+            "sha256": "7f854402871b7f533132e3b47b5c6364238783b5cf2af6435ab6b459f912e8e6"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.10"
+            "python_version": "3.8"
         },
         "sources": [
             {
@@ -229,11 +229,11 @@
         },
         "packaging": {
             "hashes": [
-                "sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb",
-                "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"
+                "sha256:5d50835fdf0a7edf0b55e311b7c887786504efea1177abd7e69329a8e5ea619e",
+                "sha256:99276dc6e3a7851f32027a68f1095cd3f77c148091b092ea867a351811cfe388"
             ],
             "index": "pypi",
-            "version": "==21.3"
+            "version": "==16.8"
         },
         "platformdirs": {
             "hashes": [
@@ -347,11 +347,11 @@
         },
         "sceptre": {
             "hashes": [
-                "sha256:2bbe00cca5409475853096a56557d63c3f62cd47c9bc266209961b98f616802e",
-                "sha256:a7db54df3a946a1d16f8c8488fed7d7f0951ec3cefdd8226a9f81052a1f2044d"
+                "sha256:0925b14a7a715b31e77f5f5b6c0608e17cb1258e5b8d1dce5b37fe0790e3a2ca",
+                "sha256:c76ec7f95ccfa403dc47e41daa496efff7a4771028236d364c6f4fa1c73bbe80"
             ],
             "index": "pypi",
-            "version": "==3.1.0"
+            "version": "==3.0.0"
         },
         "sceptre-cmd-resolver": {
             "hashes": [
