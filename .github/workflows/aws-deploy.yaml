@@ -18,12 +18,48 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
 
-      - name: Setup code, pipenv, aws
-        uses: Sage-Bionetworks/action-pipenv-aws-setup@v1
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up python
+        uses: actions/setup-python@v2
         with:
-          aws_access_key_id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
-          role_to_assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install pipenv
+        shell: bash
+        run: |
+          # python --version
+          # python -m pip install --user pipenv==v2022.4.20
+          python -m pip install --user pipenv
+          pipenv --version
+
+      - name: Install dependencies
+        env:
+          PIPENV_NOSPIN: 'true'
+        shell: bash
+        run: |
+          pipenv install --dev --verbose
+
+      - name: Assume AWS role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
+          role-duration-seconds: 1200
+
+      # - name: Setup code, pipenv, aws
+      #   uses: Sage-Bionetworks/action-pipenv-aws-setup@v1
+      #   with:
+      #     aws_access_key_id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
+      #     aws_secret_access_key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
+      #     role_to_assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
+
+      - name: Debug dependencies
+        run: |
+          pipenv run pip freeze
 
       - name: Deploy sceptre stacks
         run: pipenv run sceptre launch develop --yes
