@@ -9,5 +9,8 @@ python_version = "3.8"
 [dev-packages]
 pre-commit = "==2.*"
 sceptre = ">=2.7.1"
+sceptre-cmd-resolver = "1.1.2"
+sceptre-resolver-aws-secrets-manager = {file = "https://github.com/iAnomaly/sceptre-resolver-aws-secrets-manager/archive/v1.0.0.tar.gz"}
+sceptre-ssm-resolver = "1.2.1"
 
 [packages]

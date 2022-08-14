@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9b36e2cda640d9800547ea5f3a5716341f96ffbff49a6260aab0e37a004f2f36"
+            "sha256": "da967a3e90de94167c4f26feb1ed6516b44510ed56768cc5cf24c479b00bbe23"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -358,6 +358,7 @@
                 "sha256:4cc7409ee43923bc97dc60b6d3bec2e129876e1ab9ca0ba656d4f8c40b2ac87b",
                 "sha256:ff83298ae86a51df150de28cd17c3754c64aad2bc7813c3095cc5cfc7fad89f1"
             ],
+            "index": "pypi",
             "version": "==1.2.1"
         },
         "sceptre-file-resolver": {
@@ -367,13 +368,28 @@
             ],
             "version": "==1.0.6"
         },
+        "sceptre-resolver-aws-secrets-manager": {
+            "file": "https://github.com/iAnomaly/sceptre-resolver-aws-secrets-manager/archive/v1.0.0.tar.gz",
+            "hashes": [
+                "sha256:3430280ceb0efc3ae5671e8432732d4c878d6f2c94138219039770d0fa29c16a"
+            ],
+            "version": "==1.0.0"
+        },
+        "sceptre-ssm-resolver": {
+            "hashes": [
+                "sha256:caf2713190e96af20569c48c1b5c4f42ea29838e011493432cc7a69f21b9fe02",
+                "sha256:dbff1b33b2f86e4e2349f3e3a583f46065596ac57f3623d5fc3243e150a97f5c"
+            ],
+            "index": "pypi",
+            "version": "==1.2.2"
+        },
         "setuptools": {
             "hashes": [
-                "sha256:194b74f2c2d1800268fe2d857d99981e7c04d010de3099f04ee45ebec535e560",
-                "sha256:3bcaf6e27ad3b0f643ba0a48c5ab9eca930c3eb51df0e068f4826ab880c394ea"
+                "sha256:d73f8cd714a1a6691f5eb5abeeacbf313242b7aa2f5eba93776542c1aad90c6f",
+                "sha256:fe9a97f68b064a6ddd4bacfb0b4b93a4c65a556d97ce906255540439d0c35cef"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==64.0.3"
+            "version": "==65.0.0"
         },
         "six": {
             "hashes": [
