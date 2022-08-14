@@ -1,0 +1,329 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Provision EC2 instance, set up prefect on it.
+
+Parameters:
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.small
+
+  VpcSubnet:
+    Description: Name of an existing VPC subnet to run the instance in.
+    Type: String
+
+  VpcId:
+    Description: 'ID of an existing VPC to run the instance in'
+    Type: String
+
+  EncryptVolume:
+    Type: String
+    Description: true to encrypt root volume, false (default) for no encryption
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    ConstraintDescription: 'Must be true or false'
+
+  AMIId:
+    Description: The ID of the AMI to deploy
+    Type: AWS::EC2::Image::Id
+    ConstraintDescription: Valid AMIs are at https://ami.sageit.org/
+
+  VolumeSize:
+    Description: The EC2 volume size (in GB)
+    Type: Number
+    Default: 20
+    MinValue: 10
+    MaxValue: 2000
+
+  BackupEc2:
+    Type: String
+    Description: true to enable daily EC2 backup, false (default) for no backup
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+  SnapshotCount:
+    Description: The number of snapshots to keep, only used if BackupEc2=true
+    Type: Number
+    MinValue: 1
+    MaxValue: 180
+    Default: 7
+    ConstraintDescription: Valid values are 1-180
+
+  BucketName:
+    Description: A bucket the EC2 can access
+    Type: String
+
+Conditions:
+  # PublicEc2Resources: !Or [!Equals [ !Ref VpcSubnet, PublicSubnet ], !Equals [ !Ref VpcSubnet, PublicSubnet1 ], !Equals [ !Ref VpcSubnet, PublicSubnet2 ] ]
+  #HasKeyName: !Not [!Equals ['', !Ref KeyName]]
+  EnableEc2Backup: !Equals [!Ref BackupEc2, true]
+
+Resources:
+
+  VpnSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow traffic from VPN'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - CidrIp: '10.1.0.0/16'  # Sophos VPN
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+        - CidrIp: '10.50.0.0/16'  # AWS VPN
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+
+{% if sceptre_user_data.OpenPorts is defined %}
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Open a port for incoming traffic'
+      VpcId: !ImportValue
+        'Fn::Sub': '${AWS::Region}-${VpcName}-VPCId'
+      SecurityGroupIngress:
+  {% for port in sceptre_user_data.OpenPorts %}
+        - CidrIp: '0.0.0.0/0'
+          FromPort: {{ port }}
+          ToPort: {{ port }}
+          IpProtocol: tcp
+  {% endfor %}
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+{% endif %}
+
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          SetupCfn:
+            - cfn_hup_service
+          SetupTools:
+            - install_tools
+          SetupPrefect:
+            - install_prefect
+        # Cfn-hup setting, it is to monitor the change of metadata.
+        # When there is change in the contents of json file in the metadata section,
+        # cfn-hup will call cfn-init.
+        cfn_hup_service:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                verbose=true
+                interval=5
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Ec2Instance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupPrefect --region ${AWS::Region}
+              mode: '000400'
+              owner: root
+              group: root
+            /lib/systemd/system/cfn-hup.service:
+              content: !Sub |
+                [Unit]
+                Description=cfn-hup daemon
+
+                [Service]
+                Type=simple
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+
+                [Install]
+                WantedBy=multi-user.target
+              mode: '000400'
+              owner: root
+              group: root
+          commands:
+            01_enable_cfn-hup:
+              command: '/bin/systemctl enable cfn-hup.service'
+            02_start_cfn-hup:
+              command: '/bin/systemctl start cfn-hup.service'
+        install_tools:
+          commands:
+            01_jq:
+              command: '/usr/bin/apt install -y jq'
+            02_curl:
+              command: '/usr/bin/apt install -y curl'
+            03_vim:
+              command: '/usr/bin/apt install vim -y'
+            04_less:
+              command: '/usr/bin/apt install less -y'
+        install_prefect:
+          files:
+            '/etc/supervisor/supervisord.conf':
+              mode: '000644'
+              owner: 'root'
+              group: 'root'
+              content: |
+                ; supervisor config file
+
+                [unix_http_server]
+                file=/var/run/supervisor.sock   ; the path to the socket file
+                chmod=0700                      ; sockef file mode (default 0700)
+
+                [supervisord]
+                loglevel=debug                              ; log level; default info; others: debug,warn,trace
+                logfile=/var/log/supervisor/supervisord.log ; (main log file;default $CWD/supervisord.log)
+                pidfile=/var/run/supervisord.pid            ; (supervisord pidfile;default supervisord.pid)
+                childlogdir=/var/log/supervisor             ; ('AUTO' child log dir, default $TEMP)
+
+                ; the below section must remain in the config file for RPC
+                ; (supervisorctl/web interface) to work, additional interfaces may be
+                ; added by defining them in separate rpcinterface: sections
+                [rpcinterface:supervisor]
+                supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+                [supervisorctl]
+                serverurl=unix:///var/run/supervisor.sock ; use a unix:// URL  for a unix socket
+
+                ; create a group for all prefect-related programs
+                ; to issue commands that pertain to the whole group,
+                ; use a wildcard, for example, `supervisorctl start prefect:*`
+                [group:prefect]
+                programs=orion,prefect-agent
+
+                [program:orion]
+                command=prefect orion start
+                priority=100
+                autostart=true
+                autorestart=true
+                user=root
+
+                [program:prefect-agent]
+                command=prefect agent start -t default
+                priority=110
+                autostart=true
+                autorestart=true
+                user=root
+
+          commands:
+            01_install_prefect:
+              command: !Join
+                - ''
+                - - 'curl -O https://raw.githubusercontent.com/tthyer/single-instance-prefect-infra/main/install-prefect.sh; '
+                  - 'chmod +x install-prefect.sh && ./install-prefect.sh'
+            # 02_start_supervisor:
+            #   command: 'supervisord -c /etc/supervisor/supervisord.conf'
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      # KeyName: !If [HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue']
+      PropagateTagsToVolumeOnCreation: true
+      BlockDeviceMappings:
+        - DeviceName: '/dev/sda1'
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: !Ref VolumeSize
+            Encrypted: !Ref EncryptVolume
+      SubnetId: !Ref VpcSubnet
+      SecurityGroupIds:
+        - !GetAtt VpnSecurityGroup.GroupId
+{% if sceptre_user_data.OpenPorts is defined %}
+        - !GetAtt InstanceSecurityGroup.GroupId
+{% endif %}
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          apt-get update -y
+          mkdir -p /opt/aws/bin
+          wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupPrefect --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+
+  InstanceRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ListBucket
+            Effect: Allow
+            Action:
+              - 's3:ListBucket'
+            Resource:
+              - !Sub 'arn:aws:s3:::${BucketName}'
+          - Sid: ObjectActions
+            Effect: Allow
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:DeleteObject'
+              - 's3:PutObjectAcl'
+            Resource:
+              - !Sub 'arn:aws:s3:::${BucketName}/*'
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Ref InstanceRolePolicy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref 'InstanceRole'
+
+  Ec2Backup:
+    Type: 'AWS::CloudFormation::Stack'
+    Condition: EnableEc2Backup
+    Properties:
+      # template uploaded from Sage-Bionetworks/aws-infra repo
+      TemplateURL: 'https://bootstrap-awss3cloudformationbucket-19qromfd235z9.s3.amazonaws.com/aws-infra/master/ec2-backup.yaml'
+      Parameters:
+        StackName: !Ref AWS::StackName
+        SnapshotCount: !Ref SnapshotCount
+
+Outputs:
+  Ec2InstanceId:
+    Value: !Ref Ec2Instance
+    Export:
+      Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstanceId'
+  Ec2InstancePrivateIp:
+    Value: !GetAtt Ec2Instance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstancePrivateIp'
+  # Ec2InstancePublicIp:
+  #   Condition: PublicEc2Resources
+  #   Value: !GetAtt Ec2Instance.PublicIp
+  #   Export:
+  #     Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstancePublicIp'

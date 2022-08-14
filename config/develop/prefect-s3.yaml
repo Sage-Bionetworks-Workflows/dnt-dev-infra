@@ -1,0 +1,2 @@
+template_path: s3.yaml
+stack_name: prefect-s3
