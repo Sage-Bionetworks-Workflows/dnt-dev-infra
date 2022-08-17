@@ -1,6 +1,6 @@
-# infra-template
+# single-instance-prefect-infra
 
-This is an opinionated template for the creation of AWS infrastructure.
+This repository sets up AWS infrastructure for prefect installed on a single EC2 instance and an S3 bucket for storing flows and data.
 
 ## Setup
 1. Install [awscli v2](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
@@ -35,13 +35,6 @@ sceptre launch develop
 # Remove the entire 'develop' stacck group
 sceptre delete develop
 ```
-
-## Environments
-This repository template requires the creation of Github Environments that
-pair with the defined sceptre stack groups: `develop` and `prod`. If you are
-not doing development of new Cloudformation templates in this repository, but
-using externally developed ones (such as from aws-infra), you can remove
-the `develop` folder.
 
 The Github action to deploy AWS stacks relies on setting up the secrets used by
 the workflow in [Github Environments](https://docs.github.com/en/actions/reference/environments).
