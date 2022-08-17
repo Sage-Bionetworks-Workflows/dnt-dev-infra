@@ -1,4 +1,4 @@
-template_path: ec2.j2
+template_path: prefect-ec2.j2
 stack_name: prefect-ec2
 dependencies:
   - develop/prefect-s3.yaml
