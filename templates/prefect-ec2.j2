@@ -117,7 +117,7 @@ Resources:
           SetupTools:
             - install_tools
           SetupPrefect:
-            - install_prefect
+            - config_prefect_service
         # Cfn-hup setting, it is to monitor the change of metadata.
         # When there is change in the contents of json file in the metadata section,
         # cfn-hup will call cfn-init.
@@ -172,7 +172,7 @@ Resources:
               command: '/usr/bin/apt install vim -y'
             04_less:
               command: '/usr/bin/apt install less -y'
-        install_prefect:
+        config_prefect_service:
           files:
             '/etc/supervisor/supervisord.conf':
               mode: '000644'
@@ -214,20 +214,18 @@ Resources:
                 user=root
 
                 [program:prefect-agent]
-                command=prefect agent start -t default
+                command=prefect agent start -q test
                 priority=110
                 autostart=true
                 autorestart=true
                 user=root
-
           commands:
-            01_install_prefect:
+            01_restart_supervisor:
               command: !Join
                 - ''
-                - - 'curl -O https://raw.githubusercontent.com/tthyer/dnt-dev-infra/main/install-prefect.sh; '
-                  - 'chmod +x install-prefect.sh && ./install-prefect.sh'
-            # 02_start_supervisor:
-            #   command: 'supervisord -c /etc/supervisor/supervisord.conf'
+                - - 'prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api; \'
+                  - 'systemctl restart supervisor;'
+
     Properties:
       ImageId: !Ref AMIId
       InstanceType: !Ref InstanceType
@@ -250,11 +248,36 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           apt-get update -y
+          # NOTE: prefect requires python3
+          # install python 3.9 and make it the python3 preferred installation
+          apt install python3.9 -y
+          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 2
+          ## make python3 the default python on ubuntu
+          apt install python-is-python3 -y
+          # this is where I had added site-packages path to PATH
+          echo "export PATH=$(python -m site --user-site):$PATH" >> /etc/profile
+          # install pip3 in Ubuntu
+          apt install python3-pip -y
+          # sqlite3
+          # install sqlite3 on ubuntu
+          apt install sqlite3 -y
+          # install prefect and supervisor
+          pip install 'prefect==2.2.0' s3fs
+          echo "export PATH=/home/ubuntu/.local/bin:$PATH" >> /etc/profile
+          # install supervisor
+          # - note using the distribution version because it is acceptably recent
+          #   and provides the integration into systemd
+          # - service config is placed at /usr/lib/systemd/system/supervisor.service
+          # - use option here to avoid overwriting the conf file
+          #   that is already in place at /etc/supervisor/supervisord.conf
+          apt-get install -o Dpkg::Options::="--force-confold" supervisor
           mkdir -p /opt/aws/bin
           wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupPrefect --region ${AWS::Region}
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
