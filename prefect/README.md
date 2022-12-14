@@ -7,7 +7,7 @@
 
 ## Connect to Prefect UI
 - Ensure you are set up to use session manager on your local machine: https://sagebionetworks.jira.com/wiki/spaces/IT/pages/2632286259/AWS+SSM+Session+Manager
-- Run the port-forwarding script: https://github.com/Sage-Bionetworks-Workflows/dnt-dev-infra/blob/main/utils/prefect-port-forward.sh 
+- Run the port-forwarding script: https://github.com/Sage-Bionetworks-Workflows/dnt-dev-infra/blob/main/utils/prefect-port-forward.sh
 - Goto http://127.0.0.1:4200/
 - To create a session on the EC2, see "Helpful Tips" section below.
 
@@ -44,7 +44,7 @@ The prefect-ec2 Cloudformation deployment creates an orion server and starts an 
 First, Connect to the Prefect EC2 (see above).
 
 ### Build the deployment file
-This will create a YAML file that describes the deployment. 
+This will create a YAML file that describes the deployment.
 
 ```
 prefect deployment build ./healthcheck_flow.py:healthcheck -n healthcheck -q test
