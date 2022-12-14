@@ -3,6 +3,7 @@
 This repository sets up AWS infrastructure for prefect installed on a single EC2 instance and an S3 bucket for storing flows and data.
 
 ## Setup
+
 1. Install [awscli v2](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
 1. This relies on python dependencies. We recommmend installing one of the latest versions of python3.
 1. Install [pipenv](git@github.com:tthyer/infra-template.git) for python environment management.
