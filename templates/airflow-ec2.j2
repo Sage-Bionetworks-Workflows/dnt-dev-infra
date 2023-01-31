@@ -1,14 +1,14 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: Provision EC2 instance, set up prefect on it.
+Description: Provision EC2 instance, set up airflow on it.
 
 Parameters:
 
   InstanceType:
     Description: EC2 instance type
     Type: String
-    Default: t3.small
+    Default: t3a.xlarge
 
   VpcSubnet:
     Description: Name of an existing VPC subnet to run the instance in.
@@ -31,6 +31,7 @@ Parameters:
     Description: The ID of the AMI to deploy
     Type: AWS::EC2::Image::Id
     ConstraintDescription: Valid AMIs are at https://ami.sageit.org/
+    Default: ami-0aa7d40eeae50c9a9
 
   VolumeSize:
     Description: The EC2 volume size (in GB)
@@ -55,9 +56,6 @@ Parameters:
     Default: 7
     ConstraintDescription: Valid values are 1-180
 
-  BucketName:
-    Description: A bucket the EC2 can access
-    Type: String
 
 Conditions:
   # PublicEc2Resources: !Or [!Equals [ !Ref VpcSubnet, PublicSubnet ], !Equals [ !Ref VpcSubnet, PublicSubnet1 ], !Equals [ !Ref VpcSubnet, PublicSubnet2 ] ]
@@ -76,10 +74,22 @@ Resources:
           FromPort: -1
           ToPort: -1
           IpProtocol: '-1'
-        - CidrIp: '10.50.0.0/16'  # AWS VPN
+        - CidrIp: '10.50.0.0/16'  # AWS VPN Private IP
           FromPort: -1
           ToPort: -1
-          IpProtocol: '-1'
+          IpProtocol: '-1'       
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - Postgress DB
+          FromPort: 5432
+          ToPort: 5432
+          IpProtocol: 'tcp'
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - Airflow UI
+          FromPort: 8080
+          ToPort: 8080
+          IpProtocol: 'tcp'
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - SSH
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: 'tcp'
       SecurityGroupEgress:
         - CidrIp: '0.0.0.0/0'
           FromPort: -1
@@ -116,8 +126,8 @@ Resources:
             - cfn_hup_service
           SetupTools:
             - install_tools
-          SetupPrefect:
-            - config_prefect_service
+          SetupAirflow:
+            - config_airflow_service
         # Cfn-hup setting, it is to monitor the change of metadata.
         # When there is change in the contents of json file in the metadata section,
         # cfn-hup will call cfn-init.
@@ -138,7 +148,7 @@ Resources:
                 [cfn-auto-reloader-hook]
                 triggers=post.update
                 path=Resources.Ec2Instance.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupPrefect --region ${AWS::Region}
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupAirflow --region ${AWS::Region}
               mode: '000400'
               owner: root
               group: root
@@ -172,7 +182,7 @@ Resources:
               command: '/usr/bin/apt install vim -y'
             04_less:
               command: '/usr/bin/apt install less -y'
-        config_prefect_service:
+        config_airflow_service:
           files:
             '/etc/supervisor/supervisord.conf':
               mode: '000644'
@@ -200,31 +210,25 @@ Resources:
                 [supervisorctl]
                 serverurl=unix:///var/run/supervisor.sock ; use a unix:// URL  for a unix socket
 
-                ; create a group for all prefect-related programs
+                ; create a group for all airflow-related programs
                 ; to issue commands that pertain to the whole group,
-                ; use a wildcard, for example, `supervisorctl start prefect:*`
-                [group:prefect]
-                programs=orion,prefect-agent
+                ; use a wildcard, for example, `supervisorctl start airflow:*`
+                [group:airflow]
+                programs=airflow
 
-                [program:orion]
-                command=prefect orion start
+                [program:airflow]
+                command=docker-compose -f $HOME/orca-recipes-airflow/docker-compose.yaml up --build
                 priority=100
                 autostart=true
                 autorestart=true
                 user=root
 
-                [program:prefect-agent]
-                command=prefect agent start -q test
-                priority=110
-                autostart=true
-                autorestart=true
-                user=root
+
           commands:
             01_restart_supervisor:
               command: !Join
                 - ''
-                - - 'prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api; \'
-                  - 'systemctl restart supervisor;'
+                - - 'systemctl restart supervisor;'
 
     Properties:
       ImageId: !Ref AMIId
@@ -247,69 +251,53 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          apt-get update -y
-          # NOTE: prefect requires python3
-          # install python 3.9 and make it the python3 preferred installation
-          apt install python3.9 -y
-          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
-          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 2
-          ## make python3 the default python on ubuntu
-          apt install python-is-python3 -y
-          # this is where I had added site-packages path to PATH
-          echo "export PATH=$(python -m site --user-site):$PATH" >> /etc/profile
-          # install pip3 in Ubuntu
-          apt install python3-pip -y
-          # sqlite3
-          # install sqlite3 on ubuntu
-          apt install sqlite3 -y
-          # install prefect and supervisor
-          pip install 'prefect==2.2.0' s3fs
-          echo "export PATH=/home/ubuntu/.local/bin:$PATH" >> /etc/profile
+
+          yum check-update
+          yum install git -y
+          yum install docker -y
+
+          yum install python3 -y
+
           # install supervisor
           # - note using the distribution version because it is acceptably recent
           #   and provides the integration into systemd
           # - service config is placed at /usr/lib/systemd/system/supervisor.service
           # - use option here to avoid overwriting the conf file
           #   that is already in place at /etc/supervisor/supervisord.conf
-          apt-get install -o Dpkg::Options::="--force-confold" supervisor
+          amazon-linux-extras install epel -y
+          yum install supervisor -y
           mkdir -p /opt/aws/bin
           wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupPrefect --region ${AWS::Region}
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupAirflow --region ${AWS::Region}
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+
+          # Install docker-compose v2 with yum - pending confirmation that the repo is working
+          # yum install -y yum-utils
+          # yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+          # yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+          curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname-s)-$(uname -m) -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+
+          systemctl start docker
+
+          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git $HOME/orca-recipes-airflow
+          
+          
 
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
 
-  InstanceRolePolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: ListBucket
-            Effect: Allow
-            Action:
-              - 's3:ListBucket'
-            Resource:
-              - !Sub 'arn:aws:s3:::${BucketName}'
-          - Sid: ObjectActions
-            Effect: Allow
-            Action:
-              - 's3:PutObject'
-              - 's3:GetObject'
-              - 's3:DeleteObject'
-              - 's3:PutObjectAcl'
-            Resource:
-              - !Sub 'arn:aws:s3:::${BucketName}/*'
 
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
-        - !Ref InstanceRolePolicy
+        - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+        - 'arn:aws:iam::aws:policy/AmazonSSMPatchAssociation'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

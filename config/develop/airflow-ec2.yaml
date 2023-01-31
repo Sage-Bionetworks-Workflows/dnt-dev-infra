@@ -1,0 +1,5 @@
+template_path: airflow-ec2.j2
+stack_name: airflow-ec2
+parameters:
+  VpcSubnet: !stack_output_external MWAA-VPC::PrivateSubnet1
+  VpcId: !stack_output_external MWAA-VPC::VPC
