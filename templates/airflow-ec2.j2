@@ -77,7 +77,7 @@ Resources:
         - CidrIp: '10.50.0.0/16'  # AWS VPN Private IP
           FromPort: -1
           ToPort: -1
-          IpProtocol: '-1'       
+          IpProtocol: '-1'
         - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - Postgress DB
           FromPort: 5432
           ToPort: 5432
@@ -217,7 +217,7 @@ Resources:
                 programs=airflow
 
                 [program:airflow]
-                command=docker-compose -f $HOME/orca-recipes-airflow/docker-compose.yaml up --build
+                command=docker compose -f /root/orca-recipes-airflow/docker-compose.yaml up --build
                 priority=100
                 autostart=true
                 autorestart=true
@@ -252,11 +252,19 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
 
-          yum check-update
-          yum install git -y
-          yum install docker -y
+          # Add the official Docker (apt-get) repository
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" \
+            | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-          yum install python3 -y
+          # Install some tools using apt-get
+          apt-get update -y
+          apt-get install -y git
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
           # install supervisor
           # - note using the distribution version because it is acceptably recent
@@ -264,31 +272,21 @@ Resources:
           # - service config is placed at /usr/lib/systemd/system/supervisor.service
           # - use option here to avoid overwriting the conf file
           #   that is already in place at /etc/supervisor/supervisord.conf
-          amazon-linux-extras install epel -y
-          yum install supervisor -y
+          apt-get install -o Dpkg::Options::="--force-confold" supervisor
+
+          # Clone Airflow DAGs repository
+          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
+
+          # Install and run cfn-init
           mkdir -p /opt/aws/bin
           wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupAirflow --region ${AWS::Region}
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
 
-          # Install docker-compose v2 with yum - pending confirmation that the repo is working
-          # yum install -y yum-utils
-          # yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-          # yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-          curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname-s)-$(uname -m) -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
-
-          systemctl start docker
-
-          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git $HOME/orca-recipes-airflow
-          
-          
-
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT5M
+        Timeout: PT15M
 
 
   InstanceRole:
