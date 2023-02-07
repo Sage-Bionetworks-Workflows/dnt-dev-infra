@@ -1,0 +1,338 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Provision EC2 instance, set up airflow on it.
+
+Parameters:
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3a.xlarge
+
+  VpcSubnet:
+    Description: Name of an existing VPC subnet to run the instance in.
+    Type: String
+
+  VpcId:
+    Description: 'ID of an existing VPC to run the instance in'
+    Type: String
+
+  EncryptVolume:
+    Type: String
+    Description: true to encrypt root volume, false (default) for no encryption
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    ConstraintDescription: 'Must be true or false'
+
+  AMIId:
+    Description: The ID of the AMI to deploy
+    Type: AWS::EC2::Image::Id
+    ConstraintDescription: Valid AMIs are at https://ami.sageit.org/
+    Default: ami-0aa7d40eeae50c9a9
+
+  VolumeSize:
+    Description: The EC2 volume size (in GB)
+    Type: Number
+    Default: 20
+    MinValue: 10
+    MaxValue: 2000
+
+  BackupEc2:
+    Type: String
+    Description: true to enable daily EC2 backup, false (default) for no backup
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+  SnapshotCount:
+    Description: The number of snapshots to keep, only used if BackupEc2=true
+    Type: Number
+    MinValue: 1
+    MaxValue: 180
+    Default: 7
+    ConstraintDescription: Valid values are 1-180
+
+
+Conditions:
+  # PublicEc2Resources: !Or [!Equals [ !Ref VpcSubnet, PublicSubnet ], !Equals [ !Ref VpcSubnet, PublicSubnet1 ], !Equals [ !Ref VpcSubnet, PublicSubnet2 ] ]
+  #HasKeyName: !Not [!Equals ['', !Ref KeyName]]
+  EnableEc2Backup: !Equals [!Ref BackupEc2, true]
+
+Resources:
+
+  VpnSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow traffic from VPN'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - CidrIp: '10.1.0.0/16'  # Sophos VPN
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+        - CidrIp: '10.50.0.0/16'  # AWS VPN Private IP
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - Postgress DB
+          FromPort: 5432
+          ToPort: 5432
+          IpProtocol: 'tcp'
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - Airflow UI
+          FromPort: 8080
+          ToPort: 8080
+          IpProtocol: 'tcp'
+        - CidrIp: '52.44.61.21/32'  # AWS VPN Public IP - SSH
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: 'tcp'
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+
+{% if sceptre_user_data.OpenPorts is defined %}
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Open a port for incoming traffic'
+      VpcId: !ImportValue
+        'Fn::Sub': '${AWS::Region}-${VpcName}-VPCId'
+      SecurityGroupIngress:
+  {% for port in sceptre_user_data.OpenPorts %}
+        - CidrIp: '0.0.0.0/0'
+          FromPort: {{ port }}
+          ToPort: {{ port }}
+          IpProtocol: tcp
+  {% endfor %}
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: '-1'
+{% endif %}
+
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          SetupCfn:
+            - cfn_hup_service
+          SetupTools:
+            - install_tools
+          SetupAirflow:
+            - config_airflow_service
+        # Cfn-hup setting, it is to monitor the change of metadata.
+        # When there is change in the contents of json file in the metadata section,
+        # cfn-hup will call cfn-init.
+        cfn_hup_service:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                verbose=true
+                interval=5
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Ec2Instance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupAirflow --region ${AWS::Region}
+              mode: '000400'
+              owner: root
+              group: root
+            /lib/systemd/system/cfn-hup.service:
+              content: !Sub |
+                [Unit]
+                Description=cfn-hup daemon
+
+                [Service]
+                Type=simple
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+
+                [Install]
+                WantedBy=multi-user.target
+              mode: '000400'
+              owner: root
+              group: root
+          commands:
+            01_enable_cfn-hup:
+              command: '/bin/systemctl enable cfn-hup.service'
+            02_start_cfn-hup:
+              command: '/bin/systemctl start cfn-hup.service'
+        install_tools:
+          commands:
+            01_jq:
+              command: '/usr/bin/apt install -y jq'
+            02_curl:
+              command: '/usr/bin/apt install -y curl'
+            03_vim:
+              command: '/usr/bin/apt install vim -y'
+            04_less:
+              command: '/usr/bin/apt install less -y'
+        config_airflow_service:
+          files:
+            '/etc/supervisor/supervisord.conf':
+              mode: '000644'
+              owner: 'root'
+              group: 'root'
+              content: |
+                ; supervisor config file
+
+                [unix_http_server]
+                file=/var/run/supervisor.sock   ; the path to the socket file
+                chmod=0700                      ; sockef file mode (default 0700)
+
+                [supervisord]
+                loglevel=debug                              ; log level; default info; others: debug,warn,trace
+                logfile=/var/log/supervisor/supervisord.log ; (main log file;default $CWD/supervisord.log)
+                pidfile=/var/run/supervisord.pid            ; (supervisord pidfile;default supervisord.pid)
+                childlogdir=/var/log/supervisor             ; ('AUTO' child log dir, default $TEMP)
+
+                ; the below section must remain in the config file for RPC
+                ; (supervisorctl/web interface) to work, additional interfaces may be
+                ; added by defining them in separate rpcinterface: sections
+                [rpcinterface:supervisor]
+                supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+                [supervisorctl]
+                serverurl=unix:///var/run/supervisor.sock ; use a unix:// URL  for a unix socket
+
+                ; create a group for all airflow-related programs
+                ; to issue commands that pertain to the whole group,
+                ; use a wildcard, for example, `supervisorctl start airflow:*`
+                [group:airflow]
+                programs=airflow
+
+                [program:airflow]
+                command=docker compose -f /root/orca-recipes-airflow/docker-compose.yaml up --build
+                priority=100
+                autostart=true
+                autorestart=true
+                user=root
+
+
+          commands:
+            01_restart_supervisor:
+              command: !Join
+                - ''
+                - - 'systemctl restart supervisor;'
+
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      # KeyName: !If [HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue']
+      PropagateTagsToVolumeOnCreation: true
+      BlockDeviceMappings:
+        - DeviceName: '/dev/sda1'
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: !Ref VolumeSize
+            Encrypted: !Ref EncryptVolume
+      SubnetId: !Ref VpcSubnet
+      SecurityGroupIds:
+        - !GetAtt VpnSecurityGroup.GroupId
+{% if sceptre_user_data.OpenPorts is defined %}
+        - !GetAtt InstanceSecurityGroup.GroupId
+{% endif %}
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+
+          # Add the official Docker (apt-get) repository
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" \
+            | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          # Install some tools using apt-get
+          apt-get update -y
+          apt-get install -y git
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+          # install supervisor
+          # - note using the distribution version because it is acceptably recent
+          #   and provides the integration into systemd
+          # - service config is placed at /usr/lib/systemd/system/supervisor.service
+          # - use option here to avoid overwriting the conf file
+          #   that is already in place at /etc/supervisor/supervisord.conf
+          apt-get install -o Dpkg::Options::="--force-confold" supervisor
+
+          # Clone Airflow DAGs repository
+          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
+
+          # Install and run cfn-init
+          mkdir -p /opt/aws/bin
+          wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --configsets SetupCfn,SetupTools,SetupAirflow --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+        - 'arn:aws:iam::aws:policy/AmazonSSMPatchAssociation'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref 'InstanceRole'
+
+  Ec2Backup:
+    Type: 'AWS::CloudFormation::Stack'
+    Condition: EnableEc2Backup
+    Properties:
+      # template uploaded from Sage-Bionetworks/aws-infra repo
+      TemplateURL: 'https://bootstrap-awss3cloudformationbucket-19qromfd235z9.s3.amazonaws.com/aws-infra/master/ec2-backup.yaml'
+      Parameters:
+        StackName: !Ref AWS::StackName
+        SnapshotCount: !Ref SnapshotCount
+
+Outputs:
+  Ec2InstanceId:
+    Value: !Ref Ec2Instance
+    Export:
+      Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstanceId'
+  Ec2InstancePrivateIp:
+    Value: !GetAtt Ec2Instance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstancePrivateIp'
+  # Ec2InstancePublicIp:
+  #   Condition: PublicEc2Resources
+  #   Value: !GetAtt Ec2Instance.PublicIp
+  #   Export:
+  #     Name: !Sub '${AWS::Region}-${AWS::StackName}-Ec2InstancePublicIp'
