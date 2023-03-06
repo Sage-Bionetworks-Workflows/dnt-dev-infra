@@ -1,0 +1,6 @@
+template_path: airflow-ec2.j2
+stack_name: airflow-ec2
+parameters:
+  VpcSubnet: !stack_output_external airflow-vpc::PrivateSubnet1
+  VpcId: !stack_output_external airflow-vpc::VPCId
+  AMIId: !ssm "/aws/service/canonical/ubuntu/eks/20.04/1.22/stable/current/amd64/hvm/ebs-gp2/ami-id"
