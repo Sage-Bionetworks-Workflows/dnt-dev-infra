@@ -1,4 +1,6 @@
 aws_infra_templates_root_url: https://raw.githubusercontent.com/Sage-Bionetworks/aws-infra
 default_stack_tags:
   Department: IBC
+  Project: Infrastructure
   CostCenter: NO PROGRAM / 000000
+  OwnerEmail: dpe@sagebase.org
