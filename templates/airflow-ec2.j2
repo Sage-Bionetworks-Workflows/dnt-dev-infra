@@ -277,6 +277,10 @@ Resources:
           # Clone Airflow DAGs repository
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
 
+          #Add Cron jobs for updating airflow instance
+          (crontab -l 2>/dev/null || echo ""; echo "0 * * * * cd /root/orca-recipes-airflow && git pull") | crontab -
+          (crontab -l 2>/dev/null || echo ""; echo "0 18 * * * cd /root/orca-recipes-airflow && docker compose down && docker compose up --build --detach") | crontab -
+
           # Install and run cfn-init
           mkdir -p /opt/aws/bin
           wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
