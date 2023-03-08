@@ -277,6 +277,9 @@ Resources:
           # Clone Airflow DAGs repository
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
 
+          #Install cron
+          apt-get install -y cron
+          
           #Add Cron jobs for updating airflow instance
           (crontab -l 2>/dev/null || echo ""; echo "0 * * * * cd /root/orca-recipes-airflow && git pull") | crontab -
           (crontab -l 2>/dev/null || echo ""; echo "0 18 * * * cd /root/orca-recipes-airflow && docker compose down && docker compose up --build --detach") | crontab -
