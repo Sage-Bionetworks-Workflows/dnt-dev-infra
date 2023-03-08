@@ -277,6 +277,9 @@ Resources:
           # Clone Airflow DAGs repository
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
 
+          #create .env file
+          cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
+
           #Install cron
           apt-get install -y cron
 
