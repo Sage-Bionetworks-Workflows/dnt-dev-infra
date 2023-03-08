@@ -1,4 +1,4 @@
-# single-instance-airflow-infra
+# Single Instance Airflow Infra
 
 This repository sets up AWS infrastructure for airflow installed on a single EC2 instance.
 
@@ -14,7 +14,7 @@ This repository sets up AWS infrastructure for airflow installed on a single EC2
 
 The Pipfile installs the following dependencies in a virtual environment:
 * [sceptre](https://sceptre.cloudreach.com/2.6.3/) for better AWS CloudFormation deployment
-* [pre-commit](https://pre-commit.com/), to ensure
+* [pre-commit](https://pre-commit.com/) for running pre-commit checks
 
 ## Testing sceptre deployment
 
