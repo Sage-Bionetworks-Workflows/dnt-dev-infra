@@ -48,9 +48,5 @@ jobs:
           role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
           role-duration-seconds: 1200
 
-      - name: Debug dependencies
-        run: |
-          pipenv run pip freeze
-
       - name: Deploy sceptre stacks
         run: pipenv run sceptre launch prod --yes

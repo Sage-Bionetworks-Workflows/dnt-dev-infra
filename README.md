@@ -25,15 +25,15 @@ If your text editor (_e.g._ Visual Studio Code) or shell (_e.g._ using [`direnv`
 pipenv shell
 
 # Test the deployment of a single stack in the 'prod' stack group
-sceptre launch develop/orca-vpc.yaml
+sceptre launch prod/airflow-ec2.yaml
 
 # Delete the test deployment of a single stack the 'develop' stack group
-sceptre delete develop/orca-vpc.yaml
+sceptre delete prod/airflow-ec2.yaml
 
-# Test deploying the entire 'develop' stack group
+# Test deploying the entire 'prod' stack group
 sceptre launch prod
 
-# Remove the entire 'develop' stack group
+# Remove the entire 'prod' stack group
 sceptre delete prod
 ```
 
