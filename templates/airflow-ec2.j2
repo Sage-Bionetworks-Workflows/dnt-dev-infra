@@ -286,6 +286,9 @@ Resources:
           #create .env file
           cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
 
+          #add user and pass to .env
+          echo -e '_AIRFLOW_WWW_USER_USERNAME="dpe"\n_AIRFLOW_WWW_USER_PASSWORD="password"' >> /root/orca-recipes-airflow/.env
+
           #Install cron
           apt-get install -y cron
 
