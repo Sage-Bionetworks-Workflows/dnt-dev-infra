@@ -266,6 +266,12 @@ Resources:
           apt-get install -y git
           apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
+          #set docker bridge
+          sed -i 's/"bridge": "none"/"bridge": "docker0"/' /etc/docker/daemon.json
+
+          # Restart Docker daemon
+          systemctl restart docker
+
           # install supervisor
           # - note using the distribution version because it is acceptably recent
           #   and provides the integration into systemd
