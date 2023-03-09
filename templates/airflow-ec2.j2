@@ -283,11 +283,14 @@ Resources:
           # Clone Airflow DAGs repository
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
 
+          # Get AWS Secret airflow_password and store as variable
+          airflow_password=$(aws secretsmanager get-secret-value --secret-id airflow_password --query SecretString --region us-east-1 | tr -d '"')
+
           #create .env file
           cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
 
           #add user and pass to .env
-          echo -e '_AIRFLOW_WWW_USER_USERNAME="dpe"\n_AIRFLOW_WWW_USER_PASSWORD="password"' >> /root/orca-recipes-airflow/.env
+          echo -e "_AIRFLOW_WWW_USER_USERNAME=dpe\n_AIRFLOW_WWW_USER_PASSWORD=$airflow_password" >> /root/orca-recipes-airflow/.env
 
           #Install cron
           apt-get install -y cron
