@@ -1,9 +1,0 @@
-template_path: prefect-ec2.j2
-stack_name: prefect-ec2
-dependencies:
-  - develop/prefect-s3.yaml
-parameters:
-  VpcSubnet: !stack_output_external MWAA-VPC::PrivateSubnet1
-  VpcId: !stack_output_external MWAA-VPC::VPC
-  AMIId: !ssm "/aws/service/canonical/ubuntu/eks/20.04/1.22/stable/current/amd64/hvm/ebs-gp2/ami-id"
-  BucketName: !stack_output_external prefect-s3::BucketName

@@ -1,5 +1,7 @@
 template_path: airflow-ec2.j2
 stack_name: airflow-ec2
+dependencies:
+  - prod/orca-vpc.yaml
 parameters:
   VpcSubnet: !stack_output_external orca-vpc::PrivateSubnet1
   VpcId: !stack_output_external orca-vpc::VPCId

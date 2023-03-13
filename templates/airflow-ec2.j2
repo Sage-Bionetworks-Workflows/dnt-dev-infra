@@ -266,6 +266,12 @@ Resources:
           apt-get install -y git
           apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
+          #set docker bridge
+          sed -i 's/"bridge": "none"/"bridge": "docker0"/' /etc/docker/daemon.json
+
+          # Restart Docker daemon
+          systemctl restart docker
+
           # install supervisor
           # - note using the distribution version because it is acceptably recent
           #   and provides the integration into systemd
@@ -276,6 +282,16 @@ Resources:
 
           # Clone Airflow DAGs repository
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
+
+          #create .env file
+          cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
+
+          #Install cron
+          apt-get install -y cron
+
+          #Add Cron jobs for updating airflow instance
+          (crontab -l 2>/dev/null || echo ""; echo "0 * * * * cd /root/orca-recipes-airflow && git pull") | crontab -
+          (crontab -l 2>/dev/null || echo ""; echo "0 18 * * * cd /root/orca-recipes-airflow && docker compose down && docker compose up --build --detach") | crontab -
 
           # Install and run cfn-init
           mkdir -p /opt/aws/bin

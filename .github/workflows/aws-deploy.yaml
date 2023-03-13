@@ -17,7 +17,6 @@ jobs:
     needs: pre-commit
     if: github.ref == 'refs/heads/main'
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v2
 
@@ -36,30 +35,18 @@ jobs:
 
       - name: Install dependencies
         env:
-          PIPENV_NOSPIN: 'true'
+          PIPENV_NOSPIN: "true"
         shell: bash
         run: |
           pipenv install --dev --verbose
 
-      - name: Assume AWS role
+      - name: Assume AWS Role
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-          role-to-assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
+          role-to-assume: arn:aws:iam::766808016710:role/sagebase-github-oidc-sage-bio-ProviderRoledntinfra-E6ACSGZNUQNE
+          role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
           role-duration-seconds: 1200
 
-      # - name: Setup code, pipenv, aws
-      #   uses: Sage-Bionetworks/action-pipenv-aws-setup@v1
-      #   with:
-      #     aws_access_key_id: ${{ secrets.CI_USER_ACCESS_KEY_ID }}
-      #     aws_secret_access_key: ${{ secrets.CI_USER_SECRET_ACCESS_KEY }}
-      #     role_to_assume: ${{ secrets.CI_ROLE_TO_ASSUME }}
-
-      - name: Debug dependencies
-        run: |
-          pipenv run pip freeze
-
       - name: Deploy sceptre stacks
-        run: pipenv run sceptre launch develop --yes
+        run: pipenv run sceptre launch prod --yes

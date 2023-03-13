@@ -1,6 +1,6 @@
-# single-instance-prefect-infra
+# Single Instance Airflow Infra
 
-This repository sets up AWS infrastructure for prefect installed on a single EC2 instance and an S3 bucket for storing flows and data.
+This repository sets up AWS infrastructure for airflow installed on a single EC2 instance.
 
 ## Setup
 
@@ -14,7 +14,7 @@ This repository sets up AWS infrastructure for prefect installed on a single EC2
 
 The Pipfile installs the following dependencies in a virtual environment:
 * [sceptre](https://sceptre.cloudreach.com/2.6.3/) for better AWS CloudFormation deployment
-* [pre-commit](https://pre-commit.com/), to ensure
+* [pre-commit](https://pre-commit.com/) for running pre-commit checks
 
 ## Testing sceptre deployment
 
@@ -24,20 +24,23 @@ If your text editor (_e.g._ Visual Studio Code) or shell (_e.g._ using [`direnv`
 # Activate the pipenv virtual environment to use sceptre
 pipenv shell
 
-# Test the deployment of a single stack in the 'develop' stack group
-sceptre launch develop/my-template.yaml
+# Test the deployment of a single stack in the 'prod' stack group
+sceptre launch prod/airflow-ec2.yaml
 
 # Delete the test deployment of a single stack the 'develop' stack group
-sceptre delete develop/my-template.yaml
+sceptre delete prod/airflow-ec2.yaml
 
-# Test deploying the entire 'develop' stack group
-sceptre launch develop
+# Test deploying the entire 'prod' stack group
+sceptre launch prod
 
-# Remove the entire 'develop' stacck group
-sceptre delete develop
+# Remove the entire 'prod' stack group
+sceptre delete prod
 ```
 
-The Github action to deploy AWS stacks relies on setting up the secrets used by
-the workflow in [Github Environments](https://docs.github.com/en/actions/reference/environments).
-Set up environments for each AWS account you're deploying to. This is where
-you'll put secrets such as the ones for your CI user credentials.
+When using this repository locally, you will need to authenticate your AWS account prior to performing any `sceptre` operations.
+
+You can do so by using Session Manager on your local machine: https://sagebionetworks.jira.com/wiki/spaces/IT/pages/2632286259/AWS+SSM+Session+Manager
+
+Once authenticated, `sceptre launch` commands will deploy resources defined in the `prod/` directory to the account which you are logged into.
+
+For example, you could log into a development account such as `org-sagebase-dnt-dev` and then run `sceptre launch prod -y` to launch all resources in the `prod` group.
