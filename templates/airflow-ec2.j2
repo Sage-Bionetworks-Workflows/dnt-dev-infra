@@ -284,7 +284,8 @@ Resources:
           git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
 
           # Get AWS Secret airflow_password and store as variable
-          airflow_password=$(aws --output text secretsmanager get-secret-value --secret-id airflow_password --query SecretString --region us-east-1)
+          airflow_password=$(bash /root/orca-recipes-airflow/airflow_password.sh)
+
 
           #create .env file
           cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
