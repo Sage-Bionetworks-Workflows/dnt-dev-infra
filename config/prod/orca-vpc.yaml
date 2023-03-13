@@ -1,0 +1,10 @@
+template:
+  type: http
+  url: "{{stack_group_config.aws_infra_templates_root_url}}/v0.6.8/templates/VPC/vpc-mini.yaml"
+stack_name: orca-vpc
+
+parameters:
+  VpcName: orca-vpc
+  VpcSubnetPrefix: "172.255.24"
+
+stack_tags: {{stack_group_config.default_stack_tags}}
