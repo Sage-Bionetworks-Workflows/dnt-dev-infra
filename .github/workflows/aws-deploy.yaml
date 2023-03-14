@@ -21,21 +21,13 @@ jobs:
       contents: read
     #if: github.ref == 'refs/heads/main'
     steps:
-      - name: Assume AWS Role
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::766808016710:role/sagebase-github-oidc-sage-bio-ProviderRoledntinfra-E6ACSGZNUQNE
-          role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
-          role-duration-seconds: 1200
-
       - name: Checkout repository
         uses: actions/checkout@v2
 
       - name: Set up python
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ inputs.python_version }}
+          python-version: 3.8
 
       - name: Install pipenv
         shell: bash
@@ -51,6 +43,14 @@ jobs:
         shell: bash
         run: |
           pipenv install --dev --verbose
+
+      - name: Assume AWS Role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::766808016710:role/sagebase-github-oidc-sage-bio-ProviderRoledntinfra-E6ACSGZNUQNE
+          role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
+          role-duration-seconds: 1200
 
       - name: Deploy sceptre stacks
         run: pipenv run sceptre launch prod --yes
