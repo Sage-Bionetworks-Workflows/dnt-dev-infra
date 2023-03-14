@@ -5,6 +5,6 @@ stack_name: orca-vpc
 
 parameters:
   VpcName: orca-vpc
-  VpcSubnetPrefix: "172.255.24"
+  VpcSubnetPrefix: "10.255.24"
 
 stack_tags: {{stack_group_config.default_stack_tags}}
