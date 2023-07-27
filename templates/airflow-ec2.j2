@@ -217,7 +217,7 @@ Resources:
                 programs=airflow
 
                 [program:airflow]
-                command=docker compose -f /root/orca-recipes-airflow/docker-compose.yaml up --build
+                command=docker compose -f /root/orca-recipes/docker-compose.yaml up --build
                 priority=100
                 autostart=true
                 autorestart=true
@@ -281,24 +281,24 @@ Resources:
           apt-get install -o Dpkg::Options::="--force-confold" supervisor
 
           # Clone Airflow DAGs repository
-          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes-airflow.git /root/orca-recipes-airflow
+          git clone https://github.com/Sage-Bionetworks-Workflows/orca-recipes.git /root/orca-recipes
 
           # Get AWS Secret airflow_password and store as variable
-          airflow_password=$(bash /root/orca-recipes-airflow/airflow_password.sh)
+          airflow_password=$(bash /root/orca-recipes/airflow_password.sh)
 
 
           #create .env file
-          cp /root/orca-recipes-airflow/.env.example /root/orca-recipes-airflow/.env
+          cp /root/orca-recipes/.env.example /root/orca-recipes/.env
 
           #add user and pass to .env
-          echo -e "_AIRFLOW_WWW_USER_USERNAME=dpe\n_AIRFLOW_WWW_USER_PASSWORD=$airflow_password" >> /root/orca-recipes-airflow/.env
+          echo -e "_AIRFLOW_WWW_USER_USERNAME=dpe\n_AIRFLOW_WWW_USER_PASSWORD=$airflow_password" >> /root/orca-recipes/.env
 
           #Install cron
           apt-get install -y cron
 
           #Add Cron jobs for updating airflow instance
-          (crontab -l 2>/dev/null || echo ""; echo "0 * * * * cd /root/orca-recipes-airflow && git pull") | crontab -
-          (crontab -l 2>/dev/null || echo ""; echo "0 18 * * * cd /root/orca-recipes-airflow && docker compose down && docker compose up --build --detach") | crontab -
+          (crontab -l 2>/dev/null || echo ""; echo "0 * * * * cd /root/orca-recipes && git pull") | crontab -
+          (crontab -l 2>/dev/null || echo ""; echo "0 18 * * * cd /root/orca-recipes && docker compose down && docker compose up --build --detach") | crontab -
 
           # Install and run cfn-init
           mkdir -p /opt/aws/bin
